@@ -1,3 +1,10 @@
+// Trigger pipeline on GitHub push
+properties([
+    pipelineTriggers([
+        githubPush()
+    ])
+])
+
 pipeline {
     agent any
 
