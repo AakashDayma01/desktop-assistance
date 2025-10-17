@@ -1,16 +1,7 @@
-# greetings.py
-import datetime
+# desctop_assis.py
 
-def get_greeting():
-    """Return greeting based on current time"""
-    hour = datetime.datetime.now().hour
-    if hour < 12:
-        return "Good morning!"
-    elif hour < 18:
-        return "Good afternoon!"
-    else:
-        return "Good evening!"
+def add(a, b):
+    return a + b
 
-def say_hello(name):
-    """Return a hello message"""
-    return f"Hello, {name}!"
+def multiply(a, b):
+    return a * b
