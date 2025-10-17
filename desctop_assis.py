@@ -1,30 +1,16 @@
-# voice_assistant.py
-import pyttsx3
+# greetings.py
 import datetime
 
-def speak(text):
-    """Speak text using pyttsx3"""
-    engine = pyttsx3.init('sapi5')
-    engine.say(text)
-    engine.runAndWait()
-
-def wishme():
-    """Return greeting depending on the time"""
+def get_greeting():
+    """Return greeting based on current time"""
     hour = datetime.datetime.now().hour
     if hour < 12:
-        greeting = "Good morning sir!"
+        return "Good morning!"
     elif hour < 18:
-        greeting = "Good afternoon sir!"
+        return "Good afternoon!"
     else:
-        greeting = "Good evening sir!"
-    speak(greeting)
-    return greeting
+        return "Good evening!"
 
-def takeCommand():
-    """Simulated command (mocked in tests)"""
-    return "hello world"
-
-if __name__ == "__main__":
-    wishme()
-    cmd = takeCommand()
-    print(f"Command received: {cmd}")
+def say_hello(name):
+    """Return a hello message"""
+    return f"Hello, {name}!"
