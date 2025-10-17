@@ -32,10 +32,11 @@ pipeline {
 
         stage('Run Tests') {
             steps {
-                echo "🧪 Running test_voice_assistant.py..."
+                echo "🧪 Running unit tests..."
                 script {
                     try {
-                        bat 'python test_voice_assistant.py > test_output.txt 2>&1'
+                        // Run unittest in headless mode
+                        bat 'python -m unittest test_voice_assistant.py > test_output.txt 2>&1'
                         echo "✅ All tests passed."
                     } catch (err) {
                         echo "❌ Tests failed! Saving logs..."
@@ -51,6 +52,9 @@ pipeline {
         }
 
         stage('Commit and Push Changes') {
+            when {
+                expression { return currentBuild.currentResult == 'SUCCESS' }
+            }
             steps {
                 echo "📤 Pushing updates to GitHub..."
                 bat '''
