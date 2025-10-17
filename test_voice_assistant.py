@@ -10,6 +10,9 @@ class TestDesctopAssis(unittest.TestCase):
     def test_multiply(self):
         self.assertEqual(da.multiply(2, 3), 6)
         self.assertEqual(da.multiply(-1, 5), -5)
+    def test_devide(self):
+        self.assertEqual(da.devide(2, 3), 6)
+        self.assertEqual(da.devide(-1, 5), -5)
 
 if __name__ == "__main__":
     unittest.main()
