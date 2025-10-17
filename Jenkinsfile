@@ -2,29 +2,17 @@ pipeline {
     agent any
 
     environment {
-        GIT_CREDENTIALS = 'github-credentials'
-        GIT_REPO = 'https://github.com/AakashDayma01/desktop-assistance.git'
-        BRANCH = 'main'
         LOG_FILE = 'jenkins_build_log.txt'
     }
 
     stages {
-        stage('Clone Repository') {
-            steps {
-                echo "🔽 Cloning repository..."
-                git branch: "${BRANCH}", credentialsId: "${GIT_CREDENTIALS}", url: "${GIT_REPO}"
-            }
-        }
-
         stage('Install Dependencies') {
             steps {
                 echo "📦 Installing Python dependencies..."
                 bat '''
+                python -m pip install --upgrade pip
                 if exist requirements.txt (
-                    python -m pip install --upgrade pip
                     pip install -r requirements.txt
-                ) else (
-                    echo No requirements.txt found, skipping install.
                 )
                 '''
             }
@@ -35,8 +23,7 @@ pipeline {
                 echo "🧪 Running unit tests..."
                 script {
                     try {
-                        // Run unittest in headless mode
-                        bat 'python -m unittest test_voice_assistant.py > test_output.txt 2>&1'
+                        bat 'python -m unittest discover -s . -p "test_*.py" > test_output.txt 2>&1'
                         echo "✅ All tests passed."
                     } catch (err) {
                         echo "❌ Tests failed! Saving logs..."
@@ -50,28 +37,11 @@ pipeline {
                 }
             }
         }
-
-        stage('Commit and Push Changes') {
-            when {
-                expression { return currentBuild.currentResult == 'SUCCESS' }
-            }
-            steps {
-                echo "📤 Pushing updates to GitHub..."
-                bat '''
-                git config user.name "Jenkins CI"
-                git config user.email "jenkins@example.com"
-                git add .
-                git commit -m "✅ Auto update from Jenkins on %date% %time%" || echo No changes to commit
-                git pull --rebase origin %BRANCH%
-                git push origin %BRANCH%
-                '''
-            }
-        }
     }
 
     post {
         success {
-            echo '🎉 Build succeeded and changes pushed to GitHub!'
+            echo '🎉 Build succeeded!'
         }
         failure {
             echo '⚠️ Build failed. Check log for details.'
