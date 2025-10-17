@@ -1,28 +1,15 @@
-# test_greetings.py
 import unittest
+import desctop_assis as da
 
-from unittest.mock import patch
-import greetings
+class TestDesctopAssis(unittest.TestCase):
 
-class TestGreetings(unittest.TestCase):
+    def test_add(self):
+        self.assertEqual(da.add(2, 3), 5)
+        self.assertEqual(da.add(-1, 1), 0)
 
-    @patch('greetings.datetime')
-    def test_get_greeting_morning(self, mock_datetime):
-        mock_datetime.datetime.now.return_value.hour = 9
-        self.assertEqual(greetings.get_greeting(), "Good morning!")
-
-    @patch('greetings.datetime')
-    def test_get_greeting_afternoon(self, mock_datetime):
-        mock_datetime.datetime.now.return_value.hour = 15
-        self.assertEqual(greetings.get_greeting(), "Good afternoon!")
-
-    @patch('greetings.datetime')
-    def test_get_greeting_evening(self, mock_datetime):
-        mock_datetime.datetime.now.return_value.hour = 20
-        self.assertEqual(greetings.get_greeting(), "Good evening!")
-
-    def test_say_hello(self):
-        self.assertEqual(greetings.say_hello("Alice"), "Hello, Alice!")
+    def test_multiply(self):
+        self.assertEqual(da.multiply(2, 3), 6)
+        self.assertEqual(da.multiply(-1, 5), -5)
 
 if __name__ == "__main__":
     unittest.main()
