@@ -1,4 +1,4 @@
-// Trigger pipeline on GitHub push
+// ✅ Trigger pipeline on GitHub push
 properties([
     pipelineTriggers([
         githubPush()
