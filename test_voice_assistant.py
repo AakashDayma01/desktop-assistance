@@ -1,5 +1,6 @@
 # test_greetings.py
 import unittest
+
 from unittest.mock import patch
 import greetings
 
