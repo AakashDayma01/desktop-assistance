@@ -16,8 +16,8 @@ class TestDesctopAssis(unittest.TestCase):
         self.assertAlmostEqual(da.divide(-1, 5), -0.2)
     
     def test_subtract(self):
-        self.assertEqual(da.subtract(2, 3), 5)
-        self.assertEqual(da.subtract(-1, 1), 0)
+        self.assertEqual(da.subtract(3, 2), 1)
+        self.assertEqual(da.subtract(-2, 1), -3)
 
 if __name__ == "__main__":
     unittest.main()
