@@ -1,74 +1,82 @@
-// ✅ Trigger pipeline on GitHub push
-properties([
-    pipelineTriggers([
-        githubPush()
-    ])
-])
-
 pipeline {
     agent any
 
     environment {
-        LOG_FILE = 'jenkins_build_log.txt'
-        PYTHON_CMD = 'python' // Update if python path is different on your agent
+        // ✅ Use your confirmed Python path
+        PYTHON = 'C:\\Program Files\\Python311\\python.exe'
+        GIT_CREDENTIALS = 'github-credentials'   // Jenkins GitHub credentials ID
+    }
+
+    triggers {
+        githubPush()  // Automatically trigger build on GitHub push
     }
 
     stages {
+        stage('Checkout') {
+            steps {
+                echo '🔽 Cloning repository...'
+                git branch: 'main',
+                    url: 'https://github.com/AakashDayma01/desktop-assistance.git',
+                    credentialsId: "${env.GIT_CREDENTIALS}"
+            }
+        }
 
         stage('Install Dependencies') {
             steps {
-                echo "📦 Installing Python dependencies..."
-                // Use Windows batch commands
+                echo '📦 Installing dependencies...'
                 bat """
-                %PYTHON_CMD% -m pip install --upgrade pip
-                if exist requirements.txt (
-                    %PYTHON_CMD% -m pip install -r requirements.txt
-                )
+                "${env.PYTHON}" -m pip install --upgrade pip
+                "${env.PYTHON}" -m pip install -r requirements.txt
                 """
             }
         }
 
         stage('Run Tests') {
             steps {
-                echo "🧪 Running unit tests..."
+                echo '🧪 Running tests...'
+                bat """
+                "${env.PYTHON}" -m unittest discover > result.txt
+                """
+            }
+        }
+
+        stage('Check Test Results') {
+            steps {
                 script {
-                    try {
-                        // Run all test files matching test_*.py and save output to a file
-                        bat """
-                        %PYTHON_CMD% -m unittest discover -s . -p "test_*.py" > test_output.txt 2>&1
-                        if errorlevel 1 exit /b 1
-                        """
-
-                        // Print test output to Jenkins console
-                        bat 'type test_output.txt'
-
-                        echo "✅ All tests passed."
-                    } catch (err) {
-                        echo "❌ Tests failed! Saving logs..."
-                        bat """
-                        echo Build failed on %date% %time% > %LOG_FILE%
-                        echo ---- TEST OUTPUT ---- >> %LOG_FILE%
-                        type test_output.txt >> %LOG_FILE%
-                        """
-                        error("Stopping pipeline due to test failure.")
+                    def result = readFile('result.txt')
+                    echo result
+                    if (result.contains('FAILED') || result.contains('Error')) {
+                        error("❌ Tests failed — build stopped, no push performed.")
+                    } else {
+                        echo "✅ All tests passed — code safe to push."
                     }
                 }
             }
         }
 
+        stage('Commit and Push Changes') {
+            when {
+                expression { currentBuild.resultIsBetterOrEqualTo('SUCCESS') }
+            }
+            steps {
+                echo '⬆️ Pushing verified code to GitHub...'
+                bat """
+                git config user.email "youremail@example.com"
+                git config user.name "Aakash Dayma"
+                git add .
+                git commit -m "Auto-tested commit by Jenkins" || echo No changes to commit
+                git push origin main
+                """
+            }
+        }
     }
 
     post {
-        success {
-            echo '🎉 Build succeeded!'
-        }
-
         failure {
-            echo '⚠️ Build failed. Check log for details.'
-            bat """
-            echo Build failed at %date% %time% >> %LOG_FILE%
-            """
-            archiveArtifacts artifacts: "%LOG_FILE%", onlyIfSuccessful: false
+            echo '⚠️ Build failed — changes not pushed to GitHub.'
+        }
+        success {
+            echo '✅ Build passed — code tested and pushed successfully!'
         }
     }
 }
