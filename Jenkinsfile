@@ -6,7 +6,6 @@ pipeline {
     }
 
     stages {
-
         stage('Checkout SCM') {
             steps {
                 echo "🔽 Cloning repository..."
@@ -27,18 +26,24 @@ pipeline {
             }
         }
 
-        stage('Run Script') {
+        stage('Run Main Script') {
             steps {
-                echo "▶️ Running main Python script..."
-                // Replace main.py with your entry-point file
-                bat "\"${env.PYTHON_PATH}\" main.py"
+                echo "▶️ Running desktop_assis.py..."
+                bat "\"${env.PYTHON_PATH}\" desctop_assis.py"
+            }
+        }
+
+        stage('Run Tests') {
+            steps {
+                echo "🧪 Running test_voice_assistant.py..."
+                bat "\"${env.PYTHON_PATH}\" -m unittest test_voice_assistant.py"
             }
         }
     }
 
     post {
         success {
-            echo "✅ Build and script execution completed successfully!"
+            echo "✅ Build completed successfully!"
         }
         failure {
             echo "⚠️ Build failed — please check the logs."
