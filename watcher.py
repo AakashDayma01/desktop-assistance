@@ -3,8 +3,10 @@ import requests
 from watchdog.observers import Observer
 from watchdog.events import FileSystemEventHandler
 
+#11ece22e27ebaff5bc55031650d9a193f8
 # 🔧 Jenkins Job Configuration
-JENKINS_URL = "http://localhost:8080/job/DesktopAssistantPipeline/build?token=YOUR_TRIGGER_TOKEN"
+#JENKINS_URL = "http://localhost:8080/job/DesktopAssistantPipeline/build?token=CODE_SAVE_TRIGGER_TOKEN"
+JENKINS_URL = "http://Aakash:11ece22e27ebaff5bc55031650d9a193f8@localhost:8080/job/DesktopAssistantPipeline/build?token=CODE_SAVE_TRIGGER_TOKEN"
 
 class Watcher(FileSystemEventHandler):
     def on_modified(self, event):

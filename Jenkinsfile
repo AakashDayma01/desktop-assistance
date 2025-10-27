@@ -2,68 +2,82 @@ pipeline {
     agent any
 
     environment {
-        PYTHON_PATH = "C:\\Program Files\\Python311\\python.exe"
-        GIT_CREDENTIALS_ID = 'github-credentials' // Replace with your Jenkins GitHub credentials ID
-        BRANCH_NAME = 'main' // Change if your branch is different
+        PYTHON = "C:\\Program Files\\Python311\\python.exe"
     }
 
     stages {
-        stage('Checkout SCM') {
+
+        stage('Prepare Workspace') {
             steps {
-                echo "🔽 Cloning repository..."
+                echo "🧹 Cleaning workspace and preparing environment..."
+                deleteDir()
                 checkout scm
             }
         }
 
-        stage('Check Python') {
+        stage('Detect Local Changes') {
             steps {
-                echo "🐍 Checking Python version..."
-                bat "\"${env.PYTHON_PATH}\" --version"
+                echo "🔍 Checking for uncommitted local changes..."
+                bat '''
+                git status
+                git diff --stat
+                '''
             }
         }
 
-        stage('Install Dependencies') {
+        stage('Run Local Tests') {
             steps {
-                echo "📦 Skipping dependencies installation (no requirements.txt)"
-            }
-        }
-
-        stage('Run Main Script') {
-            steps {
-                echo "▶️ Running desktop_assis.py..."
-                bat "\"${env.PYTHON_PATH}\" desctop_assis.py"
-            }
-        }
-
-        stage('Run Tests') {
-            steps {
-                echo "🧪 Running test_voice_assistant.py..."
-                bat "\"${env.PYTHON_PATH}\" -m unittest test_voice_assistant.py"
-            }
-        }
-
-        stage('Push to GitHub') {
-            when {
-                expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
-            }
-            steps {
-                echo "🚀 All tests passed! Pushing code to GitHub..."
+                echo "🧪 Running unit tests on updated local code..."
                 script {
-                    // Configure Git
+                    def result = bat(
+                        script: "\"${env.PYTHON}\" -m unittest discover -s .",
+                        returnStatus: true
+                    )
+
+                    if (result != 0) {
+                        error("❌ Unit tests failed! Aborting pipeline.")
+                    } else {
+                        echo "✅ All tests passed successfully!"
+                    }
+                }
+            }
+        }
+
+        stage('Commit & Push to GitHub (if tests pass)') {
+            steps {
+                echo "🚀 Tests passed — committing and pushing updated code to GitHub..."
+                script {
+                    // Configure Git identity for Jenkins
                     bat '''
-                        git config user.name "Jenkins CI"
-                        git config user.email "jenkins@example.com"
+                    git config --global user.name "Jenkins CI"
+                    git config --global user.email "jenkins@example.com"
                     '''
-                    // Add and commit changes
+
+                    // Ignore unwanted files like .pyc or __pycache__
                     bat '''
-                        git add .
-                        git commit -m "Automated commit from Jenkins [ci skip]" || echo "No changes to commit"
+                    echo "__pycache__/" >> .gitignore
+                    echo "*.pyc" >> .gitignore
+                    git add .gitignore
                     '''
-                    // Push changes using Jenkins credentials
-                    withCredentials([usernamePassword(credentialsId: env.GIT_CREDENTIALS_ID, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+
+                    // Add and commit if there are changes
+                    bat '''
+                    git add .
+                    git diff --cached --quiet || git commit -m "✅ Auto commit by Jenkins after successful tests"
+                    '''
+
+                    // Authenticate and push
+                    withCredentials([usernamePassword(credentialsId: 'github-credentials', passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
                         bat '''
-                            git remote set-url origin https://%GIT_USER%:%GIT_PASS%@github.com/AakashDayma01/desktop-assistance.git
-                            git push origin %BRANCH_NAME%
+                        echo "🔄 Fetching latest changes from GitHub..."
+                        git remote set-url origin https://%GIT_USER%:%GIT_PASS%@github.com/AakashDayma01/desktop-assistance.git
+                        git fetch origin main
+
+                        echo "📦 Rebasing local commits on top of latest main..."
+                        git rebase origin/main || (echo "⚠️ Rebase failed, aborting..." && git rebase --abort && exit /b 1)
+
+                        echo "📤 Pushing code to GitHub..."
+                        git push origin HEAD:main
                         '''
                     }
                 }
@@ -72,11 +86,14 @@ pipeline {
     }
 
     post {
-        success {
-            echo "✅ Build and Git push completed successfully!"
-        }
         failure {
-            echo "❌ Build failed — code will not be pushed to GitHub."
+            echo "❌ Build failed — changes were NOT pushed to GitHub."
+        }
+        success {
+            echo "🎉 Build succeeded — all tests passed and code pushed successfully!"
+        }
+        always {
+            echo "📝 Build complete. Review console output for details."
         }
     }
 }
