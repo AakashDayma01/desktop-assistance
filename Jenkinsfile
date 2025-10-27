@@ -3,17 +3,15 @@ pipeline {
 
     environment {
         PYTHON_PATH = "C:\\Program Files\\Python311\\python.exe"
-        GIT_CREDENTIALS = "github-credentials"  // Jenkins credentials ID for GitHub
-        GIT_REPO = "https://github.com/AakashDayma01/desktop-assistance.git"
-        BRANCH = "main"
+        GIT_CREDENTIALS_ID = 'github-credentials' // Replace with your Jenkins GitHub credentials ID
+        BRANCH_NAME = 'main' // Change if your branch is different
     }
 
     stages {
         stage('Checkout SCM') {
             steps {
                 echo "🔽 Cloning repository..."
-                checkout([$class: 'GitSCM', branches: [[name: "${BRANCH}"]],
-                          userRemoteConfigs: [[url: "${GIT_REPO}", credentialsId: "${GIT_CREDENTIALS}"]]])
+                checkout scm
             }
         }
 
@@ -26,41 +24,48 @@ pipeline {
 
         stage('Install Dependencies') {
             steps {
-                echo "📦 Skipping dependencies installation (no requirements.txt found)"
+                echo "📦 Skipping dependencies installation (no requirements.txt)"
             }
         }
 
         stage('Run Main Script') {
             steps {
-                echo "▶️ Running desctop_assis.py..."
+                echo "▶️ Running desktop_assis.py..."
                 bat "\"${env.PYTHON_PATH}\" desctop_assis.py"
             }
         }
 
         stage('Run Tests') {
             steps {
-                echo "🧪 Running unit tests..."
+                echo "🧪 Running test_voice_assistant.py..."
                 bat "\"${env.PYTHON_PATH}\" -m unittest test_voice_assistant.py"
             }
         }
 
         stage('Push to GitHub') {
             when {
-                expression { currentBuild.currentResult == 'SUCCESS' }
+                expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
             }
             steps {
-                echo "🚀 All checks passed — pushing code to GitHub safely..."
-
-                // Use Jenkins credentials securely
-                withCredentials([usernamePassword(credentialsId: "${GIT_CREDENTIALS}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_TOKEN')]) {
-                    bat """
-                        git config user.name "%GIT_USER%"
-                        git config user.email "jenkins@local"
-                        git remote set-url origin https://%GIT_USER%:%GIT_TOKEN%@github.com/AakashDayma01/desktop-assistance.git
+                echo "🚀 All tests passed! Pushing code to GitHub..."
+                script {
+                    // Configure Git
+                    bat '''
+                        git config user.name "Jenkins CI"
+                        git config user.email "jenkins@example.com"
+                    '''
+                    // Add and commit changes
+                    bat '''
                         git add .
-                        git commit -m "Auto commit from Jenkins after successful build" || echo "No changes to commit"
-                        git push origin ${BRANCH}
-                    """
+                        git commit -m "Automated commit from Jenkins [ci skip]" || echo "No changes to commit"
+                    '''
+                    // Push changes using Jenkins credentials
+                    withCredentials([usernamePassword(credentialsId: env.GIT_CREDENTIALS_ID, usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+                        bat '''
+                            git remote set-url origin https://%GIT_USER%:%GIT_PASS%@github.com/AakashDayma01/desktop-assistance.git
+                            git push origin %BRANCH_NAME%
+                        '''
+                    }
                 }
             }
         }
@@ -68,10 +73,10 @@ pipeline {
 
     post {
         success {
-            echo "✅ Build, tests, and push completed successfully!"
+            echo "✅ Build and Git push completed successfully!"
         }
         failure {
-            echo "❌ Build or tests failed — code was not pushed to GitHub."
+            echo "❌ Build failed — code will not be pushed to GitHub."
         }
     }
 }
