@@ -1,11 +1,15 @@
 pipeline {
     agent any
 
+    options {
+        skipDefaultCheckout(true)
+    }
+
     environment {
-        WORKSPACE_DIR = "C:\\Temp\\jenkins_sync"                     // 🧩 Folder synced by watcher.py
+        WORKSPACE_DIR = "C:\\Temp\\jenkins_sync"
         GIT_REPO_URL = 'https://github.com/AakashDayma01/desktop-assistance.git'
         GIT_BRANCH = 'main'
-        GIT_CREDENTIALS_ID = 'github-credentials'                    // Must exist in Jenkins credentials
+        GIT_CREDENTIALS_ID = 'github-credentials'
         PYTHON = "C:\\Program Files\\Python311\\python.exe"
     }
 
@@ -15,7 +19,7 @@ pipeline {
             steps {
                 dir("${env.WORKSPACE_DIR}") {
                     echo "💻 Using code from synced local folder: ${env.WORKSPACE_DIR}"
-                    bat 'dir'  // ✅ Show files to confirm sync works
+                    bat 'dir'
                 }
             }
         }
@@ -30,7 +34,7 @@ pipeline {
                             returnStatus: true
                         )
                         if (result != 0) {
-                            error("❌ Tests failed! Stopping pipeline.")
+                            error("❌ Tests failed! Build stopped.")
                         } else {
                             echo "✅ All tests passed successfully!"
                         }
@@ -40,29 +44,29 @@ pipeline {
         }
 
         stage('Commit & Push to GitHub') {
-            when {
-                expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
-            }
             steps {
                 dir("${env.WORKSPACE_DIR}") {
                     echo "🚀 Committing and pushing updated code to GitHub..."
                     script {
+                        // ✅ Allow Jenkins SYSTEM user to access this repo folder
+                        bat 'git config --global --add safe.directory C:/Temp/jenkins_sync'
+
+                        // ✅ Initialize repository safely
                         bat '''
-                            git config --global user.name "Jenkins CI"
-                            git config --global user.email "jenkins@example.com"
                             git init
+                            git config user.name "Jenkins CI"
+                            git config user.email "jenkins@example.com"
                             git remote remove origin || echo No remote
                             git remote add origin https://github.com/AakashDayma01/desktop-assistance.git
                             git add .
-                            git diff --cached --quiet || git commit -m "✅ Auto commit by Jenkins after successful tests"
+                            git commit -m "✅ Auto commit by Jenkins after successful tests" || echo "Nothing to commit"
                         '''
 
+                        // ✅ Push changes using stored credentials
                         withCredentials([usernamePassword(credentialsId: "${GIT_CREDENTIALS_ID}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
                             bat """
                                 git remote set-url origin https://%GIT_USER%:%GIT_PASS%@github.com/AakashDayma01/desktop-assistance.git
-                                echo "📦 Pulling latest ${GIT_BRANCH} before pushing..."
                                 git pull --rebase origin ${GIT_BRANCH} || echo "⚠️ Pull failed, continuing..."
-                                echo "📤 Pushing updates to GitHub..."
                                 git push origin HEAD:${GIT_BRANCH}
                             """
                         }
@@ -78,9 +82,6 @@ pipeline {
         }
         failure {
             echo "🚨 Build failed — code not pushed to GitHub."
-        }
-        always {
-            echo "📝 Build complete. Review console output for details."
         }
     }
 }
