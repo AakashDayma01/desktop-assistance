@@ -3,13 +3,7 @@ def add(a, b):
 
 def multiply(a, b):
     return a * b
-
-
-
-
-#dgd dgfdg
-
-#gdgf dhgdgd
+# My name is aakash 
 def divide(a, b):
     return a / b
 
