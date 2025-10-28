@@ -6,94 +6,89 @@ pipeline {
     }
 
     stages {
-
         stage('Prepare Workspace') {
             steps {
-                echo "🧹 Cleaning workspace and preparing environment..."
-                deleteDir()
-                checkout scm
+                echo "🧹 Preparing Jenkins workspace (attached to main branch)..."
+                bat '''
+                if exist .git (
+                    echo "✅ Repo exists — cleaning..."
+                    git reset --hard
+                    git clean -fd
+                    git checkout main || git checkout -b main origin/main
+                    git branch --set-upstream-to=origin/main main
+                    git pull origin main
+                ) else (
+                    echo "🆕 Initializing repository..."
+                    git init
+                    git remote add origin https://github.com/AakashDayma01/desktop-assistance.git
+                    git fetch origin main
+                    git checkout -b main origin/main
+                    git branch --set-upstream-to=origin/main main
+                )
+                '''
             }
         }
 
         stage('Detect Local Changes') {
             steps {
-                echo "🔍 Checking for uncommitted local changes..."
-                bat '''
-                git status
-                git diff --stat
-                '''
+                echo "🔍 Checking for local changes..."
+                bat 'git status && git diff --stat'
             }
         }
 
-        stage('Run Local Tests') {
+        stage('Run Tests') {
             steps {
-                echo "🧪 Running unit tests on updated local code..."
+                echo "🧪 Running unit tests..."
                 script {
                     def result = bat(
                         script: "\"${env.PYTHON}\" -m unittest discover -s .",
                         returnStatus: true
                     )
-
                     if (result != 0) {
-                        error("❌ Unit tests failed! Aborting pipeline.")
+                        error("❌ Tests failed.")
                     } else {
-                        echo "✅ All tests passed successfully!"
+                        echo "✅ All tests passed!"
                     }
                 }
             }
         }
 
-        stage('Commit & Push to GitHub (if tests pass)') {
+        stage('Commit & Push') {
             steps {
-                echo "🚀 Tests passed — committing and pushing updated code to GitHub..."
+                echo "🚀 Committing and pushing..."
                 script {
-                    // Configure Git identity for Jenkins
                     bat '''
                     git config --global user.name "Jenkins CI"
                     git config --global user.email "jenkins@example.com"
-                    '''
 
-                    // Ignore unwanted files like .pyc or __pycache__
-                    bat '''
-                    echo "__pycache__/" >> .gitignore
-                    echo "*.pyc" >> .gitignore
-                    git add .gitignore
-                    '''
+                    if not exist .gitignore (
+                        echo "__pycache__/" > .gitignore
+                        echo "*.pyc" >> .gitignore
+                    )
 
-                    // Add and commit if there are changes
-                    bat '''
                     git add .
                     git diff --cached --quiet || git commit -m "✅ Auto commit by Jenkins after successful tests"
                     '''
+                }
 
-                    // Authenticate and push
-                    withCredentials([usernamePassword(credentialsId: 'github-credentials', passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
-                        bat '''
-                        echo "🔄 Fetching latest changes from GitHub..."
-                        git remote set-url origin https://%GIT_USER%:%GIT_PASS%@github.com/AakashDayma01/desktop-assistance.git
-                        git fetch origin main
-
-                        echo "📦 Rebasing local commits on top of latest main..."
-                        git rebase origin/main || (echo "⚠️ Rebase failed, aborting..." && git rebase --abort && exit /b 1)
-
-                        echo "📤 Pushing code to GitHub..."
-                        git push origin HEAD:main
-                        '''
-                    }
+                withCredentials([usernamePassword(credentialsId: 'github-credentials', usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+                    bat '''
+                    git remote set-url origin https://%GIT_USER%:%GIT_PASS%@github.com/AakashDayma01/desktop-assistance.git
+                    git checkout main
+                    git pull origin main --rebase
+                    git push origin main
+                    '''
                 }
             }
         }
     }
 
     post {
-        failure {
-            echo "❌ Build failed — changes were NOT pushed to GitHub."
-        }
         success {
-            echo "🎉 Build succeeded — all tests passed and code pushed successfully!"
+            echo "🎉 Build succeeded — code pushed to GitHub main branch!"
         }
-        always {
-            echo "📝 Build complete. Review console output for details."
+        failure {
+            echo "❌ Build failed — changes not pushed."
         }
     }
 }
