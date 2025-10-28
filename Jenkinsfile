@@ -2,80 +2,70 @@ pipeline {
     agent any
 
     environment {
+        WORKSPACE_DIR = "C:\\Temp\\jenkins_sync"                     // 🧩 Folder synced by watcher.py
+        GIT_REPO_URL = 'https://github.com/AakashDayma01/desktop-assistance.git'
+        GIT_BRANCH = 'main'
+        GIT_CREDENTIALS_ID = 'github-credentials'                    // Must exist in Jenkins credentials
         PYTHON = "C:\\Program Files\\Python311\\python.exe"
     }
 
     stages {
 
-        stage('Prepare Workspace') {
+        stage('Use Local Synced Code') {
             steps {
-                echo "🧹 Preparing Jenkins workspace (keeping synced code from watcher.py)..."
-                // ❌ Removed deleteDir()
-                // ❌ Removed checkout scm (we keep watcher-synced local files)
-                bat "git init"
-                bat "git remote remove origin || echo 'No remote to remove'"
-                bat "git remote add origin https://github.com/AakashDayma01/desktop-assistance.git"
+                dir("${env.WORKSPACE_DIR}") {
+                    echo "💻 Using code from synced local folder: ${env.WORKSPACE_DIR}"
+                    bat 'dir'  // ✅ Show files to confirm sync works
+                }
             }
         }
 
-        stage('Detect Local Changes') {
+        stage('Run Tests') {
             steps {
-                echo "🔍 Checking for uncommitted local changes..."
-                bat '''
-                git status
-                git diff --stat
-                '''
-            }
-        }
-
-        stage('Run Local Tests') {
-            steps {
-                echo "🧪 Running tests on updated local code..."
-                script {
-                    def result = bat(
-                        script: "\"${env.PYTHON}\" -m unittest discover -s .",
-                        returnStatus: true
-                    )
-                    if (result != 0) {
-                        error("❌ Unit tests failed! Aborting pipeline.")
-                    } else {
-                        echo "✅ All tests passed successfully!"
+                dir("${env.WORKSPACE_DIR}") {
+                    echo "🧪 Running tests on synced local code..."
+                    script {
+                        def result = bat(
+                            script: "\"${env.PYTHON}\" -m unittest discover -s .",
+                            returnStatus: true
+                        )
+                        if (result != 0) {
+                            error("❌ Tests failed! Stopping pipeline.")
+                        } else {
+                            echo "✅ All tests passed successfully!"
+                        }
                     }
                 }
             }
         }
 
-        stage('Commit & Push to GitHub (if tests pass)') {
+        stage('Commit & Push to GitHub') {
+            when {
+                expression { currentBuild.result == null || currentBuild.result == 'SUCCESS' }
+            }
             steps {
-                echo "🚀 Tests passed — committing and pushing updated code to GitHub..."
-                script {
-                    bat '''
-                    git config --global user.name "Jenkins CI"
-                    git config --global user.email "jenkins@example.com"
-                    '''
-
-                    // Ignore cache files
-                    bat '''
-                    echo "__pycache__/" >> .gitignore
-                    echo "*.pyc" >> .gitignore
-                    git add .gitignore
-                    '''
-
-                    // Add and commit only if there are changes
-                    bat '''
-                    git add .
-                    git diff --cached --quiet || git commit -m "✅ Auto commit by Jenkins after successful tests"
-                    '''
-
-                    // Authenticate and push
-                    withCredentials([usernamePassword(credentialsId: 'github-credentials', passwordVariable: 'GIT_PASS', usernameVariable: 'GIT_USER')]) {
+                dir("${env.WORKSPACE_DIR}") {
+                    echo "🚀 Committing and pushing updated code to GitHub..."
+                    script {
                         bat '''
-                        git remote set-url origin https://%GIT_USER%:%GIT_PASS%@github.com/AakashDayma01/desktop-assistance.git
-                        echo "📦 Pulling latest main before pushing..."
-                        git pull --rebase origin main || echo "⚠️ Pull failed, continuing with local changes..."
-                        echo "📤 Pushing local code to GitHub..."
-                        git push origin HEAD:main
+                            git config --global user.name "Jenkins CI"
+                            git config --global user.email "jenkins@example.com"
+                            git init
+                            git remote remove origin || echo No remote
+                            git remote add origin https://github.com/AakashDayma01/desktop-assistance.git
+                            git add .
+                            git diff --cached --quiet || git commit -m "✅ Auto commit by Jenkins after successful tests"
                         '''
+
+                        withCredentials([usernamePassword(credentialsId: "${GIT_CREDENTIALS_ID}", usernameVariable: 'GIT_USER', passwordVariable: 'GIT_PASS')]) {
+                            bat """
+                                git remote set-url origin https://%GIT_USER%:%GIT_PASS%@github.com/AakashDayma01/desktop-assistance.git
+                                echo "📦 Pulling latest ${GIT_BRANCH} before pushing..."
+                                git pull --rebase origin ${GIT_BRANCH} || echo "⚠️ Pull failed, continuing..."
+                                echo "📤 Pushing updates to GitHub..."
+                                git push origin HEAD:${GIT_BRANCH}
+                            """
+                        }
                     }
                 }
             }
@@ -83,11 +73,11 @@ pipeline {
     }
 
     post {
-        failure {
-            echo "❌ Build failed — changes were NOT pushed to GitHub."
-        }
         success {
-            echo "🎉 Build succeeded — local updates tested and pushed to GitHub successfully!"
+            echo "🎉 Build succeeded — local synced code tested and pushed to GitHub!"
+        }
+        failure {
+            echo "🚨 Build failed — code not pushed to GitHub."
         }
         always {
             echo "📝 Build complete. Review console output for details."
